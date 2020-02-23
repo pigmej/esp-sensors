@@ -3,6 +3,10 @@
 #include <Adafruit_Sensor.h>
 #include <DHT.h>
 #include <DHT_U.h>
+#include <WiFi.h>
+#include <AsyncTCP.h>
+#include <ESPAsyncWebServer.h>
+#include "wifi_settings.h"
 
 #define DHTPIN 4
 #define DHTTYPE    DHT22     // DHT 22 (AM2302)
@@ -21,10 +25,25 @@ HardwareSerial mySerial(1);                              // (ESP32 Example) crea
 
 unsigned long getDataTimer = 0;
 
+// AsyncWebServer server(80);
+
+
+
+
 void setup()
 {
     Serial.begin(115200);                                     // Device to serial monitor feedback
- 
+
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(wifi_ssid, wifi_password);
+    if (WiFi.waitForConnectResult() != WL_CONNECTED) {
+        Serial.printf("WiFi Failed!\n");
+        return;
+    }
+
+    Serial.print("IP Address: ");
+    Serial.println(WiFi.localIP());
+
     mySerial.begin(BAUDRATE, SERIAL_8N1, RX_PIN, TX_PIN); // (ESP32 Example) device to MH-Z19 serial start   
     myMHZ19.begin(mySerial);                                // *Serial(Stream) refence must be passed to library begin(). 
     myMHZ19.setFilter(true, false);
