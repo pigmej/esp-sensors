@@ -4,9 +4,8 @@
 #include <DHT.h>
 #include <DHT_U.h>
 #include <WiFi.h>
-#include <AsyncTCP.h>
-#include <ESPAsyncWebServer.h>
-#include "wifi_settings.h"
+#include <MQTT.h>
+#include "secure_settings.h" // secure...
 
 #define DHTPIN 4
 #define DHTTYPE    DHT22     // DHT 22 (AM2302)
@@ -23,12 +22,42 @@ MHZ19 myMHZ19;                                             // Constructor for li
 
 HardwareSerial mySerial(1);                              // (ESP32 Example) create device to MH-Z19 serial
 
+WiFiClient net;
+MQTTClient mqtt_client;
+
 unsigned long getDataTimer = 0;
 
-// AsyncWebServer server(80);
 
+void MQTT_Connect()
+{
+  int i = 0;
+  Serial.print("checking wifi status");
+  while (WiFi.status() != WL_CONNECTED) {
+    Serial.print(".");
+    delay(1000);
+    i++;
+    if (i > 60) {
+      return;
+    }
+  }
+  Serial.print("\nConnecting to MQTT");
+  while (!mqtt_client.connect(mqtt_clientId, mqtt_user, mqtt_password)) {
+    Serial.print(",");
+    delay(1000);
+  }
 
+  Serial.println("\nconnected!");
+  mqtt_client.subscribe("/ping");
+}
 
+void messageReceived(String &topic, String &payload) {
+  Serial.println("incoming: " + topic + " - " + payload);
+
+  // Note: Do not use the client in the callback to publish, subscribe or
+  // unsubscribe as it may cause deadlocks when other things arrive while
+  // sending and receiving acknowledgments. Instead, change a global variable,
+  // or push to a queue and handle it in the loop after calling `client.loop()`.
+}
 
 void setup()
 {
@@ -54,6 +83,10 @@ void setup()
     // Print temperature sensor details.
     sensor_t sensor;
     dht.temperature().getSensor(&sensor);
+
+    mqtt_client.begin(mqtt_host, net);
+    mqtt_client.onMessage(messageReceived);
+    MQTT_Connect();
 }
 
 void loopCO2()
@@ -89,6 +122,7 @@ void loopCO2()
       Serial.print("CO2: ");
       Serial.print(CO2);
       Serial.println(" PPM");
+      mqtt_client.publish("/home/" + String(mqtt_clientId) + "/co2", String(CO2));
   }                               
 }
 
@@ -103,6 +137,7 @@ void loopTemp()
     Serial.print(F("Temperature: "));
     Serial.print(event.temperature);
     Serial.println(F("°C"));
+    mqtt_client.publish("/home/" + String(mqtt_clientId) + "/temperature", String(event.temperature));
   }
   // Get humidity event and print its value.
   dht.humidity().getEvent(&event);
@@ -113,11 +148,17 @@ void loopTemp()
     Serial.print(F("Humidity: "));
     Serial.print(event.relative_humidity);
     Serial.println(F("%"));
+    mqtt_client.publish("/home/" + String(mqtt_clientId) + "/humidity", String(event.relative_humidity));
   }
 }
 
 void loop()
 {
+    mqtt_client.loop();
+    if (!mqtt_client.connected()) {
+      MQTT_Connect();
+    }
+
     if (millis() - getDataTimer >= 2000)
     {
       loopCO2();
