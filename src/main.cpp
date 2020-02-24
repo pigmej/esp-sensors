@@ -152,7 +152,7 @@ void loopCO2() {
     Serial.print("CO2: ");
     Serial.print(CO2);
     Serial.println(" PPM");
-    mqtt_client.publish("/home/" + _mqtt_name + "/co2", String(CO2));
+    mqtt_client.publish("sensors/sensor/" + _mqtt_name + "/co2", String(CO2));
   }
 }
 
@@ -165,7 +165,7 @@ void loopTemp() {
     Serial.print(F("Temperature: "));
     Serial.print(event.temperature);
     Serial.println(F("°C"));
-    mqtt_client.publish("/home/" + _mqtt_name + "/temperature",
+    mqtt_client.publish("sensors/sensor/" + _mqtt_name + "/temperature",
                         String(event.temperature));
   }
   // Get humidity event and print its value.
@@ -176,7 +176,7 @@ void loopTemp() {
     Serial.print(F("Humidity: "));
     Serial.print(event.relative_humidity);
     Serial.println(F("%"));
-    mqtt_client.publish("/home/" + _mqtt_name + "/humidity",
+    mqtt_client.publish("sensors/sensor/" + _mqtt_name + "/humidity",
                         String(event.relative_humidity));
   }
 }
