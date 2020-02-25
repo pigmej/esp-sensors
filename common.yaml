@@ -43,6 +43,7 @@ uart:
   tx_pin: 16
   baud_rate: 9600
 
+# MQTT Part feels hacky but needet for mqttgateway to work properly
 sensor:
   - platform: mhz19
     co2:
