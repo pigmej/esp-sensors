@@ -1,0 +1,5 @@
+substitutions:
+  devicename: krystek
+  static_ip: 192.168.4.133
+
+<<: !include common.yaml

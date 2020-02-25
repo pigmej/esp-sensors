@@ -1,0 +1,76 @@
+esphome:
+  name: $devicename
+  platform: ESP32
+  board: esp-wrover-kit
+
+wifi:
+  ssid: !secret WIFI_SSID
+  password: !secret WIFI_PASSWORD
+  fast_connect: false
+  manual_ip:
+    static_ip: $static_ip
+    gateway: 192.168.4.1
+    subnet: 255.255.255.0
+    dns1: 192.168.4.1
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: ESP32 FH $devicename
+    password: !secret FALLBACK_PASSWORD
+
+
+mqtt:
+  broker: !secret MQTT_BROKER
+  password: !secret MQTT_PASSWORD
+  username: !secret MQTT_USERNAME
+  keepalive: 10s
+
+captive_portal:
+
+# Enable logging
+logger:
+  level: INFO
+
+# Enable Home Assistant API
+api:
+  password: !secret API_PASSWORD
+
+ota:
+  password: !secret OTA_PASSWORD
+
+uart:
+  rx_pin: 17
+  tx_pin: 16
+  baud_rate: 9600
+
+sensor:
+  - platform: mhz19
+    co2:
+      name: "CO2 Value"
+      on_value:
+        then:
+          - mqtt.publish:
+              topic: sensors/sensor/$devicename/co2
+              payload: !lambda "return String(x).c_str();"
+    temperature:
+      name: "MH-Z19 Temperature"
+    update_interval: 30s
+    automatic_baseline_calibration: false
+  - platform: dht
+    model: DHT22
+    pin: 4
+    temperature:
+      name: "Temperature"
+      on_value:
+        then:
+          - mqtt.publish:
+              topic: sensors/sensor/$devicename/temperature
+              payload: !lambda "return String(x).c_str();"
+    humidity:
+      name: "Humidity"
+      on_value:
+        then:
+          - mqtt.publish:
+              topic: sensors/sensor/$devicename/humidity
+              payload: !lambda "return String(x).c_str();"
+    update_interval: 30s
