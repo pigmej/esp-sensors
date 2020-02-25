@@ -5,9 +5,12 @@
 #include <DHT_U.h>
 #include <MQTT.h>
 #include <WiFi.h>
+#include <ESPmDNS.h>
+#include <WiFiUdp.h>    
 #include <ArduinoOTA.h>
 
 #include "secure_settings.h" // secure...
+#include "sensors_version.h"
 
 #define DHTPIN 4
 #define DHTTYPE DHT22
@@ -24,31 +27,17 @@ MHZ19 myMHZ19;
 HardwareSerial mySerial(1);
 
 WiFiClient net;
-MQTTClient mqtt_client;
+MQTTClient mqtt_client(256);
 
 unsigned long getDataTimer = 0;
+unsigned long waitCount = 0;
+unsigned long pingTimer = 0;
+uint8_t conn_stat = 0;  
 
 const String _mqtt_name = String(MQTT_CLIENTID);
 
 void MQTT_Connect() {
-  int i = 0;
-  Serial.print("checking wifi status");
-  while (WiFi.status() != WL_CONNECTED) {
-    Serial.print(".");
-    delay(1000);
-    i++;
-    if (i > 60) {
-      return;
-    }
-  }
-  Serial.print("\nConnecting to MQTT");
-  while (!mqtt_client.connect(MQTT_CLIENTID, mqtt_user, mqtt_password)) {
-    Serial.print(",");
-    delay(1000);
-  }
-
-  Serial.println("\nconnected!");
-  mqtt_client.subscribe("/ping");
+  mqtt_client.connect(MQTT_CLIENTID, mqtt_user, mqtt_password);
 }
 
 void messageReceived(String &topic, String &payload) {
@@ -60,40 +49,40 @@ void messageReceived(String &topic, String &payload) {
   // or push to a queue and handle it in the loop after calling `client.loop()`.
 }
 
-void setup() {
-  Serial.begin(115200);
-
+void setupWiFi() {
+  WiFi.disconnect();
   WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE);
   WiFi.mode(WIFI_STA);
   WiFi.setHostname(DEVICE_NAME);
-  WiFi.setAutoReconnect(true);
+  // WiFi.setAutoReconnect(true);
   WiFi.begin(wifi_ssid, wifi_password);
-  if (WiFi.waitForConnectResult() != WL_CONNECTED) {
-    Serial.printf("WiFi Failed!\n");
-    return;
-  }
+}
 
-  Serial.print("IP Address: ");
-  Serial.println(WiFi.localIP());
+void setupMQTT() {
+  mqtt_client.begin(mqtt_host, net);
+  mqtt_client.onMessage(messageReceived);
+  MQTT_Connect();
+}
+
+void setup() {
+  Serial.begin(115200);
+
+  WiFi.mode(WIFI_STA);
+
+  MDNS.begin(DEVICE_NAME);
 
   mySerial.begin(BAUDRATE, SERIAL_8N1, RX_PIN, TX_PIN);
   myMHZ19.begin(mySerial);
   myMHZ19.setFilter(true, false);
   myMHZ19.autoCalibration();
-  dht.begin();
 
+  dht.begin();
   sensor_t sensor;
   dht.temperature().getSensor(&sensor);
-
-  mqtt_client.begin(mqtt_host, net);
-  mqtt_client.onMessage(messageReceived);
-  MQTT_Connect();
 
   ArduinoOTA.setPort(3232);
   ArduinoOTA.setHostname(DEVICE_NAME);
   ArduinoOTA.setPassword(ota_password);
-
-
   ArduinoOTA
     .onStart([]() {
       String type;
@@ -122,6 +111,7 @@ void setup() {
 
   ArduinoOTA.begin();
   
+  delay(10000);
 }
 
 void loopCO2() {
@@ -181,16 +171,61 @@ void loopTemp() {
   }
 }
 
-void loop() {
-  mqtt_client.loop();
-  ArduinoOTA.handle();
-  if (!mqtt_client.connected()) {
-    MQTT_Connect();
-  }
+void loopStatus() {
+  mqtt_client.publish("debug/sensors/status/" + _mqtt_name, "{\"version\":\"" + SENSORS_VERSION + "\", \"uptime\":" + millis() + "}");
+}
 
-  if (millis() - getDataTimer >= 30 * 1000) {
-    loopCO2();
-    loopTemp();
-    getDataTimer = millis();
+
+void loop() {
+  if ((WiFi.status() != WL_CONNECTED) && (conn_stat != 1)) { conn_stat = 0;}
+  if ((WiFi.status() == WL_CONNECTED) && !mqtt_client.connected() && (conn_stat != 3))  { conn_stat = 2;}
+  if ((WiFi.status() == WL_CONNECTED) && mqtt_client.connected() && (conn_stat != 5)) { conn_stat = 4;}
+  switch (conn_stat) {
+    case 0:
+      Serial.println("MQTT and WiFi down: start WiFi");
+      setupWiFi();
+      conn_stat = 1;
+      break;
+    case 1:
+      Serial.println("WiFi starting, wait: "+ String(waitCount));
+      delay(1000);
+      waitCount = waitCount + 10;
+      break;
+    case 2:
+      Serial.println("WiFi up, MQTT down: start MQTT");
+      Serial.println("MQTT lastError: " + mqtt_client.lastError());
+      setupMQTT();
+      conn_stat = 3;
+      waitCount = 0;
+      break;
+    case 3:
+      Serial.println("WiFi up, MQTT starting, wait : "+ String(waitCount));
+      delay(1000);
+      waitCount = waitCount + 10;
+      break;
+    case 4:
+      Serial.println("WiFi up, MQTT up: finish MQTT configuration");
+      mqtt_client.publish("debug/sensors/hello/" + _mqtt_name, "{\"version\":\"" + SENSORS_VERSION + "\", \"uptime\":" + millis() + "}"); // do some smart status here
+      conn_stat = 5;
+      break;
   }
+  if (waitCount >= 600) {
+    Serial.println("Restarting ESP, took too long to connect");
+    ESP.restart();
+  }
+  if (conn_stat == 5) {
+    mqtt_client.loop();
+    delay(20);
+    ArduinoOTA.handle();
+    if (millis() - getDataTimer >= 30 * 1000) {
+      loopCO2();
+      loopTemp();
+      getDataTimer = millis();
+    }
+    if (millis() - pingTimer >= 10 * 1000) {
+      loopStatus();
+      pingTimer = millis();
+    }
+  }
+  delay(100);
 }
