@@ -1,0 +1,5 @@
+substitutions:
+  devicename: kamyk
+  static_ip: 192.168.4.134
+
+<<: !include common.yaml

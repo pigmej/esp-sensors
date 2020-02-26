@@ -7,6 +7,8 @@ wifi:
   ssid: !secret WIFI_SSID
   password: !secret WIFI_PASSWORD
   fast_connect: false
+  reboot_timeout: 5min
+  power_save_mode: none
   manual_ip:
     static_ip: $static_ip
     gateway: 192.168.4.1
@@ -23,13 +25,13 @@ mqtt:
   broker: !secret MQTT_BROKER
   password: !secret MQTT_PASSWORD
   username: !secret MQTT_USERNAME
-  keepalive: 10s
+  keepalive: 5s
 
 captive_portal:
 
 # Enable logging
 logger:
-  level: INFO
+  level: DEBUG
 
 # Enable Home Assistant API
 api:
@@ -75,3 +77,8 @@ sensor:
               topic: sensors/sensor/$devicename/humidity
               payload: !lambda "return String(x).c_str();"
     update_interval: 30s
+  - platform: uptime
+    name: Uptime
+  - platform: wifi_signal
+    name: "WiFi Signal Sensor"
+    update_interval: 60s

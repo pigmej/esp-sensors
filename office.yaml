@@ -1,0 +1,5 @@
+substitutions:
+  devicename: office
+  static_ip: 192.168.4.131
+
+<<: !include common.yaml

@@ -1,0 +1,5 @@
+substitutions:
+  devicename: livingroom
+  static_ip: 192.168.4.135
+
+<<: !include common.yaml
