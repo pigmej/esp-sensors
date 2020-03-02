@@ -55,9 +55,14 @@ sensor:
           - mqtt.publish:
               topic: sensors/sensor/$devicename/co2
               payload: !lambda "return String(x).c_str();"
+      filters:
+        - sliding_window_moving_average:
+            window_size: 3
+            send_every: 2
+            send_first_at: 2
     temperature:
       name: "MH-Z19 Temperature"
-    update_interval: 30s
+    update_interval: 15s
     automatic_baseline_calibration: false
   - platform: dht
     model: DHT22
@@ -69,6 +74,11 @@ sensor:
           - mqtt.publish:
               topic: sensors/sensor/$devicename/temperature
               payload: !lambda "return String(x).c_str();"
+      filters:
+        - sliding_window_moving_average:
+            window_size: 3
+            send_every: 2
+            send_first_at: 2
     humidity:
       name: "Humidity"
       on_value:
@@ -76,7 +86,12 @@ sensor:
           - mqtt.publish:
               topic: sensors/sensor/$devicename/humidity
               payload: !lambda "return String(x).c_str();"
-    update_interval: 30s
+      filters:
+      - sliding_window_moving_average:
+          window_size: 3
+          send_every: 2
+          send_first_at: 2
+    update_interval: 15s
   - platform: uptime
     name: Uptime
   - platform: wifi_signal
