@@ -62,7 +62,7 @@ sensor:
             send_first_at: 2
     temperature:
       name: "MH-Z19 Temperature"
-    update_interval: 15s
+    update_interval: 30s
     automatic_baseline_calibration: false
   - platform: dht
     model: DHT22
@@ -91,9 +91,9 @@ sensor:
           window_size: 3
           send_every: 2
           send_first_at: 2
-    update_interval: 15s
+    update_interval: 30s
   - platform: uptime
     name: Uptime
   - platform: wifi_signal
     name: "WiFi Signal Sensor"
-    update_interval: 60s
+    update_interval: 20s
